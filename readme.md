@@ -1,59 +1,22 @@
-# Описание задачи
+## Buiding and testing
 
-Напишите программу для простейшего матчинга заявок на упрощенной бирже. На бирже торгуется четыре ценных бумаги ("A", "B", "C" и "D"). Базовая валюта биржи - доллар ("$"). 
-
-Входные данные для программы содержатся в двух файлах. Первый файл `clients.txt` содержит список клиентов биржи с указанием их исходных балансов по торгующимся ценным бумагам и доллару.
-Второй файл, `orders.txt`, это список заявок от клиентов в хронологическом порядке. 
-Результатом работы программы является файл `result.txt` аналогичный по структуре файлу `clients.txt` и содержащий состояние балансов всех клиетов после обработки всех заявок.
-
-## Описание форматов файлов
-
-Структура файлов предельно проста. Каждая строка тесктового файла содержит одну запись. Поля записи отделяются друг от друга с помощью символа табуляции (\t). 
-Имена клиентов, названия ценных бумаг - строки, состоящие из буквенных и цифровых символов ASCII без разделителей. Числовые значения представлены целыми числами. 
-
-### Файл `clients.txt`
-
-Файл списка клиетов имеет следующие поля:
- * Имя клиента
- * Баланс клиента по долларам 
- * Баланс клиента по ценной бумаге "A" в штуках
- * Баланс по ценной бумаге "B"
- * Баланс по ценной бумаге "C"
- * Баланс по ценной бумаге "D"
-
-Пример нескольких строк файла:
-
+To be able to run tests you should write the following
 ```
-C1  1000    10  5   15  0 
-C2  2000    3   35  40  10
+./gradlew test
 ```
+All required binaries and dependencies will be loaded automatically.
 
-### Файл `orders.txt`
+After tests succeed you can discover file `result.txt` containing all clients' portfolios 
+after orders from `orders.txt` have been processed in the current directory. 
 
-Файл списка заявок имеет формат:
+## Idea and some details
 
- * Имя клиента выставившего заявку
- * Символ операции: "s" - продажа или "b" - покупка.
- * Наименование ценной бумаги
- * Цена заявки (целое число за одну штуку ценной бумаги)
- * Количество продаваемых или покупаемых ценных бумаг
- 
-Пример нескольких строк файла:
+The main idea behind this implementation is to have an Exchange instance processing orders and 
+spawning new Exchange instances instead of mutating the only instance. This case is able
+to be scaled horizontally as well as vertically. In real life the same idea may be used to process orders 
+operating on streams, f.e. as a Flow in Akka Streams. 
 
-```
-C1  b   A   7   12
-C2  s   A   8   10
-```
-
-## Замечания
-
- 1. Частичное сопоставление заявок реализовывать не обязательно. Для упрощения можно сопоставлять заявки только по полному совпадению цены и количества.
- 1. Не нужно обрабатывать ситуации продажи и покупки самому себе.
- 1. Состояние счетов клиентов можно обрабатывать без транзакций.
- 1. Для простоты можно не проверять отрицательные балансы клиентов по ценным бумагам и долларам.
-
-## Ожидаемые результаты
-
- * Основной результат - файл конечного состояния счетов клиентов биржи после обработки предоставленных данных
- * Исходный код проекта на Github
- * Набор unit-тестов
+There are the following entities:
+* Client for storing client portfolio with its parameters, name and securities
+* Order for representing a bid and an ask
+* Exchange for holding clients' portfolios and processing orders

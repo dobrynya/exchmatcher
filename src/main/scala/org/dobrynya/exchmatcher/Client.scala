@@ -1,5 +1,6 @@
 package org.dobrynya.exchmatcher
 
+import scala.io.Source
 import scala.util.Try
 
 
@@ -15,28 +16,28 @@ case class Client(name: String, balances: Map[Securities.Value, Int]) {
 
   /**
     * Buys securities.
-    * @param securities securities type
+    * @param security securities type
     * @param amount securities amount
     * @param price securities price
     * @return updated buyer's account
     */
-  def buy(securities: Securities.Value, amount: Int, price: Int): Client = {
-    val dollars = balances(DOLLAR) - amount * price
-    val securitiesAmount = balances(securities) + amount
-    copy(balances = this.balances + (DOLLAR -> dollars) + (securities -> securitiesAmount))
+  def buy(security: Securities.Value, amount: Int, price: Int): Client = {
+    val dollars = balances.getOrElse(DOLLAR, 0) - amount * price
+    val securitiesAmount = balances.getOrElse(security, 0) + amount
+    copy(balances = this.balances + (DOLLAR -> dollars) + (security -> securitiesAmount))
   }
 
   /**
     * Sells securities.
-    * @param securities securities type
+    * @param security securities type
     * @param amount securities amount
     * @param price securities price
     * @return updated seller's account
     */
-  def sell(securities: Securities.Value, amount: Int, price: Int): Client = {
-    val securitiesRemaining = balances(securities) - amount
-    val dollars = balances(DOLLAR) + amount * price
-    copy(balances = this.balances + (securities -> securitiesRemaining) + (DOLLAR -> dollars))
+  def sell(security: Securities.Value, amount: Int, price: Int): Client = {
+    val securitiesRemaining = balances.getOrElse(security, 0) - amount
+    val dollars = balances.getOrElse(DOLLAR, 0) + amount * price
+    copy(balances = this.balances + (security -> securitiesRemaining) + (DOLLAR -> dollars))
   }
 }
 
@@ -48,12 +49,17 @@ object Client {
 
   private val clientString = """(.+)\t(\d{1,})\t(\d{1,})\t(\d{1,})\t(\d{1,})\t(\d{1,})""".r
 
-  def from(client: String): Option[Client] = client match {
+  def deserialize(client: String): Option[Client] = client match {
     case clientString(name, dollars, a, b, c, d) =>
       Try(Client(name, Map(DOLLAR -> dollars.toInt, A -> a.toInt, B -> b.toInt, C -> c.toInt, D -> d.toInt)))
         .toOption
     case _ => None
   }
+
+  private val securityOrder = List(DOLLAR, A, B, C, D)
+
+  def serialize(client: Client): String =
+    client.name + "\t" + securityOrder.map(client.balances.withDefault(_ => 0)).mkString("\t")
 }
 
 
