@@ -12,6 +12,8 @@ sealed trait Order {
   def security: Securities.Value
   def price: Int
   def amount: Int
+
+  def index: (Securities.Value, Int, Int) = (security, amount, price)
 }
 
 object Order {

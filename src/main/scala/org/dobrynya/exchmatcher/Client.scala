@@ -1,8 +1,6 @@
 package org.dobrynya.exchmatcher
 
-import scala.io.Source
 import scala.util.Try
-
 
 /**
   * Represents a client of the exchange.
@@ -24,7 +22,7 @@ case class Client(name: String, balances: Map[Securities.Value, Int]) {
   def buy(security: Securities.Value, amount: Int, price: Int): Client = {
     val dollars = balances.getOrElse(DOLLAR, 0) - amount * price
     val securitiesAmount = balances.getOrElse(security, 0) + amount
-    copy(balances = this.balances + (DOLLAR -> dollars) + (security -> securitiesAmount))
+    copy(balances = this.balances ++ Map(DOLLAR -> dollars, security -> securitiesAmount))
   }
 
   /**
@@ -37,7 +35,7 @@ case class Client(name: String, balances: Map[Securities.Value, Int]) {
   def sell(security: Securities.Value, amount: Int, price: Int): Client = {
     val securitiesRemaining = balances.getOrElse(security, 0) - amount
     val dollars = balances.getOrElse(DOLLAR, 0) + amount * price
-    copy(balances = this.balances + (security -> securitiesRemaining) + (DOLLAR -> dollars))
+    copy(balances = this.balances ++ Map(security -> securitiesRemaining, DOLLAR -> dollars))
   }
 }
 
@@ -47,9 +45,9 @@ case class Client(name: String, balances: Map[Securities.Value, Int]) {
 object Client {
   import Securities._
 
-  private val clientString = """(.+)\t(\d{1,})\t(\d{1,})\t(\d{1,})\t(\d{1,})\t(\d{1,})""".r
+  private val clientString = """(.+)\t(\d+)\t(\d+)\t(\d+)\t(\d+)\t(\d+)""".r
 
-  def deserialize(client: String): Option[Client] = client match {
+  def from(client: String): Option[Client] = client match {
     case clientString(name, dollars, a, b, c, d) =>
       Try(Client(name, Map(DOLLAR -> dollars.toInt, A -> a.toInt, B -> b.toInt, C -> c.toInt, D -> d.toInt)))
         .toOption

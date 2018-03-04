@@ -57,7 +57,7 @@ class ExchangeSpec extends FlatSpec with Matchers {
     val client = Client("C1", Map(DOLLAR -> 1000))
     val bid = Bid("C1", A, 10, 10)
     new Exchange(Set(client)).process(bid) should matchPattern {
-      case Right(exch: Exchange) if exch.bids == List(bid) =>
+      case Right(exch: Exchange) if exch.bids == Map(bid.index -> List(bid)) =>
     }
   }
 
@@ -65,14 +65,14 @@ class ExchangeSpec extends FlatSpec with Matchers {
     val client = Client("C1", Map(DOLLAR -> 1000))
     val ask = Ask("C1", A, 10, 10)
     new Exchange(Set(client)).process(ask) should matchPattern {
-      case Right(exch: Exchange) if exch.asks == List(ask) =>
+      case Right(exch: Exchange) if exch.asks == Map(ask.index -> List(ask)) =>
     }
   }
 
   it should "match a bid by specified security, price and amount" in {
     val ask = Ask("C2", A, 10, 10)
     new Exchange(Set(Client("C1", Map(DOLLAR -> 100)), Client("C2", Map(A -> 10)))).process(ask) match {
-      case Right(exch1) if exch1.asks.contains(ask) =>
+      case Right(exch1) if exch1.asks.contains(ask.index) =>
         exch1.process(Bid("C1", A, 10, 10)) match {
           case Right(exch2) if exch2.bids.isEmpty && exch2.asks.isEmpty =>
             exch2.portfolio("C1") should matchPattern {
@@ -92,7 +92,7 @@ class ExchangeSpec extends FlatSpec with Matchers {
   it should "match an ask by specified security, price and amount" in {
     val bid = Bid("C1", A, 10, 10)
     new Exchange(Set(Client("C1", Map(DOLLAR -> 100)), Client("C2", Map(A -> 10)))).process(bid) match {
-      case Right(exch) if exch.bids.contains(bid) =>
+      case Right(exch) if exch.bids.contains(bid.index) =>
         exch.process(Ask("C2", A, 10, 10)) match {
           case Right(exch1) if exch1.bids.isEmpty && exch1.asks.isEmpty =>
             exch1.portfolio("C1") should matchPattern {
@@ -109,13 +109,13 @@ class ExchangeSpec extends FlatSpec with Matchers {
     }
   }
 
-  def aggregatePortfolios(clients: Iterable[Client]) =
+  def aggregatePortfolios(clients: Iterable[Client]): Map[Securities.Value, Int] =
     clients.map(_.balances)
-      .foldLeft(Map(A -> 0, B -> 0, C -> 0, D -> 0)) {(acc, portfolio) =>
+      .foldLeft(Map(A -> 0, B -> 0, C -> 0, D -> 0)) { (acc, portfolio) =>
         acc.map(entry => entry._1 -> (entry._2 + portfolio.getOrElse(entry._1, 0)))
       }
 
-  def runWithCheckings(clients: Set[Client], orders: Iterable[Order]): Exchange = {
+  def runWithCheckings(clients: Set[Client], orders: Traversable[Order]): Exchange = {
     val exch = new Exchange(clients)
     val beforeTrading = aggregatePortfolios(clients)
 
@@ -167,19 +167,38 @@ class ExchangeSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly process orders from file and dump client portfolios to file after the trading day" in {
-    val parsedClients =
-      Source.fromResource("clients.txt").getLines.map(Client.deserialize).collect {
-        case Some(client) => client
-      }.toSet
-
-    val parsedOrders = Source.fromResource("orders.txt").getLines.map(Order.from).collect {
-      case Some(order) => order
-    }.toList
-
+    val parsedClients = Source.fromFile("src/test/resources/clients.txt").getLines.flatMap(Client.from).toSet
+    val parsedOrders = Source.fromFile("src/test/resources/orders.txt").getLines.flatMap(Order.from).toStream
     val afterTrading = runWithCheckings(parsedClients, parsedOrders)
 
     val w = new PrintWriter("result.txt")
     afterTrading.clients.values.toList.sortBy(_.name).map(Client.serialize).foreach(w.println)
     w.close()
+  }
+
+  it should "not match when the queue is empty" in {
+    val e = new Exchange(Set.empty)
+    e.findMatching(Bid("C1", A, 10, 10), Map.empty) shouldBe None
+    e.findMatching(Bid("C2", B, 10, 10), Map.empty) shouldBe None
+    e.findMatching(Ask("C3", A, 10, 10), Map.empty) shouldBe None
+    e.findMatching(Bid("C1", A, 10, 10), Map.empty) shouldBe None
+    e.findMatching(Bid("C1", A, 10, 10), Map.empty) shouldBe None
+  }
+
+  it should "not match when the queue contains offers from the same client" in {
+    val e = new Exchange(Set.empty)
+    val bid = Bid("C1", A, 10, 10)
+    e.findMatching(bid, Map(bid.index -> List(Ask("C1", A, 10, 10)))) shouldBe None
+  }
+
+  it should "match when the queue contains suitable bid/ask" in {
+    val e = new Exchange(Set.empty)
+
+    val bid = Bid("C1", A, 10, 10)
+    val asks = List(Ask("C2", A, 10, 10), Ask("C1", A, 10, 10))
+    for (queue <- List(asks, asks.reverse))
+      e.findMatching(bid, Map(bid.index -> queue)) should matchPattern {
+        case Some((matching, rest)) if asks.headOption.contains(matching) && rest == Map(bid.index -> asks.tail) =>
+      }
   }
 }

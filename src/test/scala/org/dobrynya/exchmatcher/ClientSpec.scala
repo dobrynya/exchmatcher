@@ -2,8 +2,6 @@ package org.dobrynya.exchmatcher
 
 import org.scalatest._
 
-import scala.io.Source
-
 /**
   * Specification in Client.
   * @author Dmitry Dobrynin <dobrynya@inbox.ru>
@@ -15,17 +13,17 @@ class ClientSpec extends FlatSpec with Matchers {
   import org.dobrynya.exchmatcher.Securities._
 
   it should "be successfully parsed from string" in {
-    Client.deserialize("C1\t1000\t130\t240\t760\t320") should matchPattern {
+    Client.from("C1\t1000\t130\t240\t760\t320") should matchPattern {
       case Some(Client("C1", balances))
         if balances == Map(DOLLAR -> 1000, A -> 130, B -> 240, C -> 760, D -> 320) =>
     }
 
-    Client.deserialize("C2\t4350\t370\t120\t950\t560") should matchPattern {
+    Client.from("C2\t4350\t370\t120\t950\t560") should matchPattern {
       case Some(Client("C2", balances))
         if balances == Map(DOLLAR -> 4350, A -> 370, B -> 120, C -> 950, D -> 560) =>
     }
 
-    Client.deserialize("C3\t2760\t0\t0\t0\t0") should matchPattern {
+    Client.from("C3\t2760\t0\t0\t0\t0") should matchPattern {
       case Some(Client("C3", balances))
         if balances == Map(DOLLAR -> 2760, A -> 0, B -> 0, C -> 0, D -> 0) =>
     }
@@ -33,7 +31,7 @@ class ClientSpec extends FlatSpec with Matchers {
 
   it should "not be parsed from incorrectly formatted string" in {
     List("C2\t4350\t370\t120\t950\t", "C3\t2760\t0\t0", "1000\t130\t240\t760\t320")
-      .map(Client.deserialize).forall(_.isEmpty) should equal(true)
+      .map(Client.from).forall(_.isEmpty) shouldBe true
   }
 
   it should "buy securities for specified price" in {
