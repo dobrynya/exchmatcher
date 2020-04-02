@@ -115,7 +115,7 @@ class ExchangeSpec extends FlatSpec with Matchers {
         acc.map(entry => entry._1 -> (entry._2 + portfolio.getOrElse(entry._1, 0)))
       }
 
-  def runWithCheckings(clients: Set[Client], orders: Traversable[Order]): Exchange = {
+  def runWithCheckings(clients: Set[Client], orders: Iterable[Order]): Exchange = {
     val exch = new Exchange(clients)
     val beforeTrading = aggregatePortfolios(clients)
 
@@ -123,6 +123,9 @@ class ExchangeSpec extends FlatSpec with Matchers {
       exch process order match {
         case Left(`UnknownClient`) =>
           println("Order %s could not be processed due to unknown client!")
+          exch
+        case Left(hz) =>
+          println(s"Order %s could not be processed due to $hz!")
           exch
         case Right(exchange) => exchange
       }
@@ -162,13 +165,13 @@ class ExchangeSpec extends FlatSpec with Matchers {
       case Some(Client("2", balances)) if balances == Map(DOLLAR -> 5000, A -> 1000, B -> 0) =>
     }
 
-    afterTrading.bids shouldBe 'empty
-    afterTrading.asks shouldBe 'empty
+    afterTrading.bids should have size 0
+    afterTrading.asks should have size 0
   }
 
   it should "correctly process orders from file and dump client portfolios to file after the trading day" in {
-    val parsedClients = Source.fromFile("src/test/resources/clients.txt").getLines.flatMap(Client.from).toSet
-    val parsedOrders = Source.fromFile("src/test/resources/orders.txt").getLines.flatMap(Order.from).toStream
+    val parsedClients = Source.fromFile("src/test/resources/clients.txt").getLines.flatMap(Client.from).to(Set)
+    val parsedOrders = Source.fromFile("src/test/resources/orders.txt").getLines.flatMap(Order.from).to(LazyList)
     val afterTrading = runWithCheckings(parsedClients, parsedOrders)
 
     val w = new PrintWriter("result.txt")

@@ -9,8 +9,9 @@ repositories {
 }
 
 dependencies {
-    compile "org.scala-lang:scala-library:2.12+"
+    compile "org.scala-lang:scala-library:2.13+"
+    compile "dev.zio:zio_2.13:1.0.0-RC18-2"
 
-    testCompile "org.scalatest:scalatest_2.12:3.0+"
+    testCompile "org.scalatest:scalatest_2.13:3.0+"
     testRuntime "org.pegdown:pegdown:1.6.0"
 }
