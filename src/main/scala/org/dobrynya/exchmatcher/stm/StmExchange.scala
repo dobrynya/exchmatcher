@@ -82,26 +82,31 @@ case class StmExchange(clients: TMap[String, Client], asks: TMap[String, List[Or
   private[stm] def placeOrder(order: Order, offers: TMap[String, List[Order]], store: TMap[String, List[Order]],
                               makeDeal: (String, String, String, Int, BigDecimal) => STM[String, Unit]) = {
 
-    def placeOrder(order: Order, offers: List[Order]): STM[String, List[Order]] =
+    def placeOrder(order: Order, offers: List[Order], inappropriateOffers: List[Order]): STM[String, List[Order]] =
       offers match {
         case Nil =>
-          store.merge(order.security, List(order))(_ ::: _).as(List.empty[Order])
+          store.merge(order.security, List(order))(_ ::: _).as(inappropriateOffers)
+        case offer :: tail if !order.matches(offer) =>
+          placeOrder(order, tail, inappropriateOffers :+ offer)
         case offer :: tail =>
-          val deal = makeDeal(offer.clientId, order.clientId, order.security,
-            Math.min(offer.amount, order.amount), offer.dealPrice(order))
-          if (offer.amount < order.amount)
-            deal *> placeOrder(order.decrease(offer.amount), tail)
-          else
-            deal.as(if (offer.amount > order.amount) offer.decrease(offer.amount - order.amount) :: tail else tail)
+          (for {
+            _ <- makeDeal(offer.clientId, order.clientId, order.security,
+              Math.min(offer.amount, order.amount), offer.dealPrice(order))
+            remainder <-
+              if (offer.amount < order.amount) placeOrder(order.decrease(offer.amount), tail, inappropriateOffers)
+              else STM.succeed(
+                inappropriateOffers :::
+                  (if (offer.amount > order.amount) List(offer.decrease(offer.amount - order.amount)) else Nil) ::: tail
+              )
+          } yield remainder).catchAll(_ => placeOrder(order, tail, inappropriateOffers :+ offer))
       }
 
     for {
-      (appropriate, inappropriate) <- offers.getOrElse(order.security, Nil).map(_.partition(order.matches))
-      remainder <- placeOrder(order, appropriate)
-      _ <- offers.put(order.security, remainder ::: inappropriate)
+      allOffers <- offers.getOrElse(order.security, Nil)
+      remainder <- placeOrder(order, allOffers, Nil)
+      _ <- offers.put(order.security, remainder)
     } yield ()
   }
-
 
   def placeAsk(ask: Order) = placeOrder(ask, bids, asks, sell)
 
